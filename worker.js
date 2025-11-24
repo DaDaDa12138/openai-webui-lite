@@ -1338,7 +1338,7 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 
     <!-- Web App Manifest -->
-    <link rel="manifest" href="site.webmanifest?v=2" />
+    <link rel="manifest" href="site.webmanifest" />
 
     <!-- iOS Safari -->
     <link rel="apple-touch-icon" href="favicon.svg" />
@@ -3455,14 +3455,14 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
           },
 
           // 包装Swal.fire以支持移动端hash管理
-          showSwal(options) {
+          showSwal(options, addHash = true) {
             const isMobile = this.isMobile;
             const originalDidOpen = options.didOpen;
             const originalWillClose = options.willClose;
 
             // 扩展didOpen回调
             options.didOpen = (...args) => {
-              if (isMobile) {
+              if (isMobile && addHash) {
                 this.addHash('modal');
                 this.swalHashAdded = true;
               }
@@ -3473,7 +3473,7 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
 
             // 扩展willClose回调
             options.willClose = (...args) => {
-              if (isMobile && this.swalHashAdded) {
+              if (isMobile && addHash && this.swalHashAdded) {
                 this.removeHash();
                 this.swalHashAdded = false;
               }
@@ -3829,16 +3829,19 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
               doDelete();
               return;
             }
-            this.showSwal({
-              title: '确认删除',
-              text: '您确定要删除这个会话吗？',
-              icon: 'warning',
-              showCancelButton: true,
-              confirmButtonColor: '#d33',
-              confirmButtonText: '删除',
-              cancelButtonText: '取消',
-              reverseButtons: true
-            }).then(result => {
+            this.showSwal(
+              {
+                title: '确认删除',
+                text: '您确定要删除这个会话吗？',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: '删除',
+                cancelButtonText: '取消',
+                reverseButtons: true
+              },
+              false
+            ).then(result => {
               if (result.isConfirmed) {
                 doDelete();
               }

@@ -2128,14 +2128,14 @@
           },
 
           // 包装Swal.fire以支持移动端hash管理
-          showSwal(options) {
+          showSwal(options, addHash = true) {
             const isMobile = this.isMobile;
             const originalDidOpen = options.didOpen;
             const originalWillClose = options.willClose;
 
             // 扩展didOpen回调
             options.didOpen = (...args) => {
-              if (isMobile) {
+              if (isMobile && addHash) {
                 this.addHash('modal');
                 this.swalHashAdded = true;
               }
@@ -2146,7 +2146,7 @@
 
             // 扩展willClose回调
             options.willClose = (...args) => {
-              if (isMobile && this.swalHashAdded) {
+              if (isMobile && addHash && this.swalHashAdded) {
                 this.removeHash();
                 this.swalHashAdded = false;
               }
@@ -2502,16 +2502,19 @@
               doDelete();
               return;
             }
-            this.showSwal({
-              title: '确认删除',
-              text: '您确定要删除这个会话吗？',
-              icon: 'warning',
-              showCancelButton: true,
-              confirmButtonColor: '#d33',
-              confirmButtonText: '删除',
-              cancelButtonText: '取消',
-              reverseButtons: true
-            }).then(result => {
+            this.showSwal(
+              {
+                title: '确认删除',
+                text: '您确定要删除这个会话吗？',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: '删除',
+                cancelButtonText: '取消',
+                reverseButtons: true
+              },
+              false
+            ).then(result => {
               if (result.isConfirmed) {
                 doDelete();
               }
