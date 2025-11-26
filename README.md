@@ -36,22 +36,37 @@
 1. **API Key**: 准备好 OpenAI 或其他兼容服务的 API Key。
 2. **域名**: 一个用于绑定的域名（推荐，可避免官方域名被墙）。
 
-### 方案一：Deno Deploy (强烈推荐) 🌟
-> **推荐理由**：部署最简单，且 Deno Deploy 的节点 IP 通常未被 OpenAI/Google 封锁，可直接调用官方 API。
+### 部署方式 A：GitHub 集成部署 (推荐)
+> **特点**：支持自动更新，当您同步了上游代码后，服务会自动重新部署。
+> **支持平台**：Deno Deploy / Cloudflare Workers
 
 1. **Fork 项目**：将本项目 Fork 到您的 GitHub 仓库。
-2. **创建项目**：登录 [Deno Deploy](https://dash.deno.com/)，点击 "New Project"，选择刚才 Fork 的仓库。
-3. **配置入口**：**Entry Point** 选择 `worker.js`，点击 "Deploy"。
-4. **绑定域名**：在项目 Settings -> Domains 中绑定您的自定义域名（自动申请 SSL）。
-5. **配置变量**：在 Settings -> Environment Variables 中添加环境变量（见下文配置章节）。
+2. **创建项目**：
+   - **Deno Deploy**: 登录 [Deno Dash](https://dash.deno.com/) -> New Project -> 选择 Fork 的仓库 -> Entry Point 选 `worker.js` -> Deploy。
+   - **Cloudflare Workers**: 登录 [Cloudflare Dash](https://dash.cloudflare.com/) -> Workers & Pages -> Create application -> Connect to Git -> 选择仓库 -> Deploy。
 
-> **⚠️ 中国大陆访问提示**：Deno Deploy 原生域名在国内无法访问。请务必绑定自定义域名，并将域名托管在 Cloudflare，开启“小黄云”代理模式（CDN），即可在国内正常访问。
+### 部署方式 B：手动复制部署 (Playground)
+> **特点**：最简单，无需 GitHub 账号，直接复制粘贴代码即可。
+> **支持平台**：Deno Deploy / Cloudflare Workers
 
-### 方案二：Cloudflare Workers
-1. **创建 Worker**：登录 Cloudflare Dashboard -> Workers & Pages -> Create Worker。
-2. **部署代码**：点击 "Edit code"，将本项目 `worker.js` 的内容完整复制进去，保存并部署。
-3. **配置变量**：在 Settings -> Variables 中添加环境变量。
-4. **绑定域名**：在 Settings -> Triggers -> Custom Domains 中绑定域名。
+1. **复制代码**：复制本项目 `worker.js` 的全部内容。
+2. **创建项目**：
+   - **Deno Deploy**: 登录 [Deno Dash](https://dash.deno.com/) -> New Playground -> 粘贴代码 -> Save & Deploy。
+   - **Cloudflare Workers**: 登录 [Cloudflare Dash](https://dash.cloudflare.com/) -> Workers & Pages -> Create Worker -> Edit code -> 粘贴代码 -> Deploy。
+
+### 后续配置 (通用)
+1. **绑定域名**：在项目设置中绑定您的自定义域名（自动申请 SSL）。
+   - *Deno Deploy*: Settings -> Domains
+   - *Cloudflare Workers*: Settings -> Triggers -> Custom Domains
+2. **配置变量**：在项目设置中添加环境变量（见下文配置章节）。
+   - *Deno Deploy*: Settings -> Environment Variables
+   - *Cloudflare Workers*: Settings -> Variables
+
+> **⚠️ 平台选择建议**：
+> - **Deno Deploy**: 部署最简单，且节点 IP 通常未被 OpenAI/Google 封锁，可直接调用官方 API。
+> - **Cloudflare Workers**: 全球节点更多，连接速度可能更快，但调用官方 API 可能需要自备代理或使用中转。
+> 
+> **⚠️ 中国大陆访问提示**：无论选择哪个平台，原生域名 (`*.deno.dev`, `*.workers.dev`) 在国内通常无法访问。请务必绑定自定义域名，并将域名托管在 Cloudflare，开启“小黄云”代理模式（CDN），即可在国内正常访问。
 
 ---
 
