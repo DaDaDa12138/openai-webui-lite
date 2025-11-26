@@ -3291,10 +3291,7 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
           },
           inputPlaceholder() {
             const session = this.currentSession || {};
-            const suffix =
-              this.globalRolePromptEnabled && this.globalRolePrompt.trim()
-                ? ' (role ✓)'
-                : '';
+            const suffix = this.getRolePrompt() ? ' (role ✓)' : '';
             if (!this.apiKey) {
               return '请先在左上角设置 API Key';
             } else if (this.isLoading) {
@@ -3867,6 +3864,13 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
             );
           },
 
+          getRolePrompt() {
+            if (this.globalRolePromptEnabled) {
+              return this.globalRolePrompt.trim();
+            }
+            return '';
+          },
+
           clearRolePrompt() {
             this.globalRolePrompt = '';
             this.globalRolePromptEnabled = true;
@@ -4393,9 +4397,7 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
               this.createNewSession();
             }
             const session = this.currentSession;
-            if (this.globalRolePromptEnabled) {
-              session.role = this.globalRolePrompt.trim();
-            }
+            session.role = this.getRolePrompt();
 
             // 判断是第一轮or第二轮问答
             if (!session.answer) {
@@ -4431,7 +4433,7 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
             this.abortController = new AbortController();
 
             // 组装messages - OpenAI格式
-            if (this.globalRolePromptEnabled && this.globalRolePrompt.trim()) {
+            if (this.getRolePrompt()) {
               const needAssistant = /claude|gpt5/i.test(this.selectedModel);
               messages.push({
                 role: !needAssistant ? 'system' : 'assistant',
@@ -4812,11 +4814,7 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
               }
               session.draft = questionText;
               this.messageInput = questionText;
-              if (!this.globalRolePromptEnabled) {
-                session.role = '';
-              } else {
-                session.role = this.globalRolePrompt.trim();
-              }
+              session.role = this.getRolePrompt();
               this.saveData();
             });
           },
