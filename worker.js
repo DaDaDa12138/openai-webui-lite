@@ -2928,7 +2928,7 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
                 ></div>
               </div>
             </div>
-            <div v-if="isLoading && !isStreaming" class="loading">
+            <div v-if="shouldShowLoading class="loading">
               <div class="spinner"></div>
               <span>AI 正在思考中...</span>
             </div>
@@ -3330,6 +3330,16 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
           canUploadImage() {
             const isModelSupport = /(gpt|qwen|kimi)/.test(this.selectedModel);
             return isModelSupport && this.isMySite;
+          },
+          // 判断是否需要显示loading
+          shouldShowLoading() {
+            if (this.isLoading) return true;
+            if (this.isStreaming) {
+              if (!this.streamingContent) return true;
+              if (this.streamingContent.endsWith(' 条相关信息。\\n\\n'))
+                return true;
+            }
+            return false;
           },
           // 判断是否需要显示"重新回答"按钮（有问题但没有回答，且没有正在加载）
           shouldShowRetryButton() {
