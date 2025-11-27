@@ -1597,7 +1597,7 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
         height: 100vh;
         height: 100dvh;
         z-index: 1000;
-        padding: 20px;
+        padding: 15px 20px;
         transform: translateX(-100%);
         transition: transform 0.3s ease;
         backdrop-filter: blur(15px);
@@ -1723,7 +1723,7 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
       }
 
       .api-key-section {
-        margin-bottom: 20px;
+        margin-bottom: 15px;
       }
 
       .api-key-input {
@@ -1823,7 +1823,7 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
       }
 
       .session-item {
-        padding: 10px 12px;
+        padding: 8px 12px;
         margin-bottom: 8px;
         background: #f8f9fa;
         border: 1px solid transparent;
@@ -1844,7 +1844,7 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
         background: #ffffff;
         color: #2d3748;
         border: 1px solid #a8edea;
-        box-shadow: 0 2px 8px rgba(168, 237, 234, 0.2);
+        box-shadow: 2px 2px 10px rgba(168, 237, 234, 0.35);
       }
 
       .session-title {
@@ -1886,7 +1886,7 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
         /* 白色外发光字 */
         text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
         cursor: pointer;
-        margin-bottom: 20px;
+        margin-bottom: 15px;
         transition: all 0.2s ease;
       }
 
