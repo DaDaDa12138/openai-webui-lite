@@ -2730,7 +2730,7 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
                 class="tool-btn wide-btn"
                 @click="toggleWideMode"
               >
-                {{ isWideMode ? '» 收窄 «' : '« 加宽 »' }}
+                {{ isWideMode ? '› 收窄 ‹' : '‹ 加宽 ›' }}
               </button>
             </div>
           </div>
