@@ -36,6 +36,14 @@
 1. **API Key**: 准备好 OpenAI 或其他兼容服务的 API Key。
 2. **域名**: 一个用于绑定的域名（推荐，可避免官方域名被墙）。
 
+### ⚡ 一键部署到 Cloudflare Workers
+
+点击下方按钮，即可快速部署到 Cloudflare Workers：
+
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/icheer/openai-webui-lite)
+
+> 首次部署需要授权 Cloudflare 访问您的 GitHub 账户，系统会自动 Fork 本仓库并完成部署。
+
 ### 部署方式 A：GitHub 集成部署 (推荐)
 > **特点**：支持自动更新，当您同步了上游代码后，服务会自动重新部署。
 > **支持平台**：Deno Deploy / Cloudflare Workers
