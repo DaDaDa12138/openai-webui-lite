@@ -805,6 +805,7 @@ function getLiteModelId(modelIds) {
     .map(i => i.split('=')[0].trim())
     .filter(i => i);
   const parts = [
+    'qwen3-max',
     '-v3',
     '-k2',
     '-mini',
