@@ -1550,7 +1550,7 @@
                   </h4>
                   <div
                     class="rendered-content markdown-body streaming-answer"
-                    v-html="renderMarkdown(isLastBotMsg(msgIndex) && (isLoading || isStreaming) ? streamingContent : msg.content)"
+                    v-html="renderMarkdown(getBotMessageContent(msg, msgIndex))"
                     @click="answerClickHandler"
                   ></div>
                 </div>
@@ -3211,6 +3211,20 @@
               if (session.messages[i].type === 'bot') return false;
             }
             return true;
+          },
+
+          // 获取bot消息应该显示的内容（处理流式回答的显示逻辑）
+          getBotMessageContent(msg, msgIndex) {
+            // 如果是最后一条bot消息 且 正在加载/流式传输 且 不是为新消息生成回复
+            // 则显示流式内容，否则显示原消息内容
+            if (
+              this.isLastBotMsg(msgIndex) &&
+              (this.isLoading || this.isStreaming) &&
+              !this.isStreamingNewAnswer
+            ) {
+              return this.streamingContent;
+            }
+            return msg.content;
           },
 
           async sendMessage() {
