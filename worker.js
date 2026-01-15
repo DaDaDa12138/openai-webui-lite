@@ -1706,8 +1706,8 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
             // 设置加载状态
             if (window.app) window.app.isLoadingRemoteSessions = true;
             try {
-              // 90秒内的缓存有效
-              const timestamp = Math.floor(Date.now() / 1000 / 90);
+              // 120秒内的缓存有效
+              const timestamp = Math.floor(Date.now() / 1000 / 120);
               var remoteData = await this.webdavGet(
                 'sessions.json?v=' + timestamp
               );
@@ -3996,6 +3996,8 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
             var suffix = this.getRolePrompt() ? ' (role ✓)' : '';
             if (!this.apiKey) {
               return '请先在左上角设置 API Key';
+            } else if (this.isLoadingRemoteSessions) {
+              return '正在加载远程数据...';
             } else if (this.isLoading) {
               return 'AI 正在思考中...';
             } else if (this.isStreaming) {
@@ -4016,6 +4018,7 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
             var session = this.currentSession;
             return (
               this.apiKey &&
+              !this.isLoadingRemoteSessions &&
               !this.isLoading &&
               !this.isStreaming &&
               !this.isMaxMessagesReached
