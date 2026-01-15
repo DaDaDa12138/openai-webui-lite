@@ -707,15 +707,38 @@ ${truncatedAnswer}
       forwardHeaders.set('Depth', depth);
     }
 
+    // 获取请求体
+    let requestBody = null;
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(apiMethod)) {
+      requestBody = await request.text();
+      // 对于有内容的请求，设置 Content-Length
+      if (requestBody) {
+        forwardHeaders.set(
+          'Content-Length',
+          new TextEncoder().encode(requestBody).length.toString()
+        );
+      }
+    }
+
     try {
+      // 调试日志
+      console.log('[WebDAV Proxy] Method:', apiMethod);
+      console.log('[WebDAV Proxy] Target URL:', targetUrl);
+      console.log(
+        '[WebDAV Proxy] Headers:',
+        Object.fromEntries(forwardHeaders.entries())
+      );
+
       // 转发请求到 WebDAV 服务器
       const webdavResponse = await fetch(targetUrl, {
         method: apiMethod,
         headers: forwardHeaders,
-        body: ['GET', 'HEAD', 'OPTIONS'].includes(apiMethod)
-          ? undefined
-          : await request.text()
+        body: requestBody,
+        redirect: 'follow'
       });
+
+      // 调试日志
+      console.log('[WebDAV Proxy] Response Status:', webdavResponse.status);
 
       // 构建响应头，添加 CORS 头
       const responseHeaders = new Headers(webdavResponse.headers);
