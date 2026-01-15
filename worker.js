@@ -3751,8 +3751,9 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
               </label>
             </div>
             <p style="margin: 8px 0 0; font-size: 12px; color: #888">
-              <span>本地存储：数据保存在浏览器中；</span>
+              <span>本地存储：数据保存在浏览器中</span>
               <br v-if="isMobile" />
+              <span v-else>；</span>
               <span>远程存储：通过 WebDAV 同步到云端</span>
             </p>
           </div>
