@@ -1449,7 +1449,7 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
 
         // 构建WebDAV代理请求头
         _buildProxyHeaders(config, extraHeaders = {}) {
-          var baseUrl = config.url.replace(/\/$/, '');
+          var baseUrl = config.url.replace(/\\/$/, '');
           var headers = {
             'X-WebDAV-URL': baseUrl,
             'X-WebDAV-Auth':
