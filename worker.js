@@ -2975,7 +2975,7 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
             </button>
           </div>
           <!-- 角色设定 -->
-          <div class="role-setting">
+          <div v-show="!isLoadingRemoteSessions" class="role-setting">
             <label
               for="rolePrompt"
               style="
@@ -3036,7 +3036,7 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
           </div>
           <!-- 新建会话按钮 -->
           <button
-            v-if="!isLoadingRemoteSessions"
+            v-show="!isLoadingRemoteSessions"
             @click="createNewSession"
             class="new-session-btn"
           >
@@ -3045,7 +3045,11 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
           <!-- 会话列表 -->
           <div class="sessions">
             <!-- 远程加载中提示 -->
-            <div v-if="isLoadingRemoteSessions" class="loading-remote-sessions">
+            <div
+              v-if="isLoadingRemoteSessions"
+              class="loading-remote-sessions"
+              style="margin-top: calc(50vh - 70px - 104px)"
+            >
               <span class="loading-spinner"></span>
               <span>正在加载远程数据...</span>
             </div>
