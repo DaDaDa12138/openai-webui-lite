@@ -4346,7 +4346,7 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
             if (!plaintexts || plaintexts.length === 0) return '';
             var lines = [];
             lines.push(
-              '\\n\\n---\\n\\n## 附件\\n\\n**以下是用户提供的附件内容，以 `<User_Attachment_数字>` 包裹：**'
+              '\\n\\n---\\n\\n## 附件\\n\\n**以下是用户提供的附件内容，以 \`<User_Attachment_数字>\` 包裹：**'
             );
             for (var i = 0; i < plaintexts.length; i++) {
               var item = plaintexts[i];
