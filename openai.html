@@ -39,13 +39,163 @@
       if (isWechat && document.title) {
         document.title = '✨ ' + document.title;
       }
-      // IndexedDB 封装
+      const $ = selector => document.querySelector(selector);
+      const $$ = selector => Array.from(document.querySelectorAll(selector));
+      // IndexedDB 封装（支持WebDAV远程存储）
       class OpenaiDB {
         constructor() {
           this.dbName = 'OpenaiChatDB';
           this.version = 1;
           this.storeName = 'chatData';
           this.db = null;
+          // WebDAV 配置
+          this.webdavEnabled = false;
+          this.webdavConfig = {
+            url: '',
+            username: '',
+            password: '',
+            path: '/openai-chat/'
+          };
+        }
+
+        // 加载WebDAV配置（从IndexedDB）
+        async loadWebDAVConfig() {
+          if (!this.db) await this.init();
+          try {
+            var configStr = await this.getItem('openai_webdav_config');
+            if (configStr) {
+              var parsed = JSON.parse(configStr);
+              this.webdavEnabled = parsed.enabled || false;
+              this.webdavConfig = parsed.config || this.webdavConfig;
+            }
+          } catch (e) {
+            console.error('解析WebDAV配置失败:', e);
+          }
+        }
+
+        // 保存WebDAV配置（到IndexedDB）
+        async saveWebDAVConfig(enabled, config) {
+          this.webdavEnabled = enabled;
+          this.webdavConfig = config;
+          // 直接写入IndexedDB，不走setItem（避免触发WebDAV同步）
+          if (!this.db) await this.init();
+          return new Promise((resolve, reject) => {
+            var transaction = this.db.transaction(
+              [this.storeName],
+              'readwrite'
+            );
+            var store = transaction.objectStore(this.storeName);
+            var request = store.put({
+              key: 'openai_webdav_config',
+              value: JSON.stringify({ enabled: enabled, config: config })
+            });
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve();
+          });
+        }
+
+        // 构建WebDAV代理URL
+        _buildProxyUrl(targetPath) {
+          // 通过 /webdav 代理接口转发请求
+          return '/webdav' + targetPath;
+        }
+
+        // 构建WebDAV代理请求头
+        _buildProxyHeaders(config, extraHeaders = {}) {
+          var baseUrl = config.url.replace(/\/$/, '');
+          var headers = {
+            'X-WebDAV-URL': baseUrl,
+            'X-WebDAV-Auth':
+              'Basic ' + btoa(config.username + ':' + config.password)
+          };
+          return Object.assign(headers, extraHeaders);
+        }
+
+        // 测试WebDAV连接
+        async testWebDAVConnection(config) {
+          var targetPath = config.path;
+          var proxyUrl = this._buildProxyUrl(targetPath);
+          var headers = this._buildProxyHeaders(config, { Depth: '0' });
+          try {
+            var response = await fetch(proxyUrl, {
+              method: 'PROPFIND',
+              headers: headers
+            });
+            // 207 Multi-Status 表示成功, 404 可能是目录不存在需要创建
+            if (response.status === 207 || response.status === 200) {
+              return { success: true };
+            } else if (response.status === 404) {
+              // 尝试创建目录
+              var mkcolResponse = await fetch(proxyUrl, {
+                method: 'MKCOL',
+                headers: this._buildProxyHeaders(config)
+              });
+              if (
+                mkcolResponse.status === 201 ||
+                mkcolResponse.status === 405
+              ) {
+                return { success: true };
+              }
+              return {
+                success: false,
+                error: '无法创建目录: HTTP ' + mkcolResponse.status
+              };
+            } else if (response.status === 401) {
+              return { success: false, error: '认证失败，请检查用户名和密码' };
+            } else {
+              return { success: false, error: 'HTTP ' + response.status };
+            }
+          } catch (e) {
+            return { success: false, error: e.message || '网络错误' };
+          }
+        }
+
+        // WebDAV 读取文件
+        async webdavGet(filename) {
+          var targetPath = this.webdavConfig.path + filename;
+          var proxyUrl = this._buildProxyUrl(targetPath);
+          var headers = this._buildProxyHeaders(this.webdavConfig);
+          try {
+            var response = await fetch(proxyUrl, {
+              method: 'GET',
+              headers: headers
+            });
+            if (response.status === 200) {
+              return await response.text();
+            } else if (response.status === 404) {
+              return null;
+            } else {
+              console.error('WebDAV GET 失败:', response.status);
+              return null;
+            }
+          } catch (e) {
+            console.error('WebDAV GET 错误:', e);
+            return null;
+          }
+        }
+
+        // WebDAV 写入文件
+        async webdavPut(filename, content) {
+          var targetPath = this.webdavConfig.path + filename;
+          var proxyUrl = this._buildProxyUrl(targetPath);
+          var headers = this._buildProxyHeaders(this.webdavConfig, {
+            'Content-Type': 'application/json'
+          });
+          try {
+            var response = await fetch(proxyUrl, {
+              method: 'PUT',
+              headers: headers,
+              body: content
+            });
+            return (
+              response.status === 200 ||
+              response.status === 201 ||
+              response.status === 204
+            );
+          } catch (e) {
+            console.error('WebDAV PUT 错误:', e);
+            return false;
+          }
         }
 
         async init() {
@@ -68,6 +218,16 @@
         }
 
         async setItem(key, value) {
+          // 如果是sessions且启用了WebDAV，则存储到远程
+          if (key === 'openai_sessions' && this.webdavEnabled) {
+            var success = await this.webdavPut('sessions.json', value);
+            if (!success) {
+              console.error('WebDAV保存sessions失败，回退到本地存储');
+            } else {
+              return;
+            }
+          }
+
           if (!this.db) await this.init();
 
           return new Promise((resolve, reject) => {
@@ -84,6 +244,16 @@
         }
 
         async getItem(key) {
+          // 如果是sessions且启用了WebDAV，则从远程读取
+          if (key === 'openai_sessions' && this.webdavEnabled) {
+            var remoteData = await this.webdavGet('sessions.json');
+            if (remoteData !== null) {
+              return remoteData;
+            }
+            // 如果远程没有数据，回退到本地
+            console.log('WebDAV无数据，尝试从本地读取');
+          }
+
           if (!this.db) await this.init();
 
           return new Promise((resolve, reject) => {
@@ -185,6 +355,7 @@
       window.openaiDB = new OpenaiDB();
     </script>
     <!-- CSS: style.css -->
+    <!-- <link rel="stylesheet" href="style.css" /> -->
     <style>
       * {
         margin: 0;
@@ -419,8 +590,34 @@
         opacity: 1;
       }
 
-      .api-key-section {
+      .settings-section {
         margin-bottom: 15px;
+      }
+
+      .settings-btn {
+        width: 100%;
+        padding: 12px 16px;
+        background: #f3f3f3;
+        border: none;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      .settings-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(168, 237, 234, 0.4);
+      }
+
+      .settings-btn:active {
+        transform: translateY(0);
       }
 
       .api-key-input {
@@ -1265,23 +1462,23 @@
           v-cloak
           style="display: none"
         >
-          <!-- API Key 设置 -->
-          <div class="api-key-section">
-            <label
-              for="apiKey"
-              style="display: block; margin-bottom: 8px; font-weight: 500"
-              @dblclick="reloadPage()"
-              >API Key:</label
+          <!-- 设置按钮 -->
+          <div class="settings-section">
+            <button
+              class="settings-btn"
+              @click="openSettingsModal()"
+              @dblclick.stop="reloadPage()"
             >
-            <input
-              type="password"
-              id="apiKey"
-              v-model="apiKey"
-              @input="saveApiKey"
-              class="api-key-input"
-              placeholder="请输入您的 OpenAI API Key"
-              autocomplete="new-password"
-            />
+              ⚙️ 设置
+              <span v-if="!apiKey" style="color: #e74c3c; margin-left: 4px"
+                >(未配置)</span
+              >
+              <span
+                v-else-if="storageMode === 'webdav'"
+                style="color: #5fbdbd; margin-left: 4px"
+                >(远程存储)</span
+              >
+            </button>
           </div>
           <!-- 角色设定 -->
           <div class="role-setting">
@@ -1940,6 +2137,245 @@
           </div>
         </div>
       </div>
+
+      <!-- 设置弹窗模板 -->
+      <div
+        v-if="!isShowSettingsModal"
+        ref="settingsTemplate"
+        style="display: none"
+      >
+        <div style="text-align: left; padding: 0 10px">
+          <!-- API Key 设置 -->
+          <div style="margin-bottom: 20px">
+            <label
+              style="
+                display: block;
+                margin-bottom: 8px;
+                font-weight: 600;
+                color: #333;
+              "
+            >
+              🔑 API Key
+            </label>
+            <input
+              type="password"
+              id="settingsApiKey"
+              class="swal-input-custom"
+              placeholder="请输入您的 OpenAI API Key"
+              autocomplete="new-password"
+              style="
+                width: 100%;
+                padding: 10px 12px;
+                border: 1px solid #ddd;
+                border-radius: 8px;
+                font-size: 14px;
+                box-sizing: border-box;
+              "
+            />
+          </div>
+
+          <!-- 存储模式切换 -->
+          <div style="margin-bottom: 20px">
+            <label
+              style="
+                display: block;
+                margin-bottom: 8px;
+                font-weight: 600;
+                color: #333;
+              "
+            >
+              💾 会话存储模式
+            </label>
+            <div style="display: flex; gap: 12px">
+              <label
+                style="
+                  display: flex;
+                  align-items: center;
+                  cursor: pointer;
+                  padding: 10px 10px;
+                  border: 2px solid #ddd;
+                  border-radius: 8px;
+                  flex: 1;
+                  transition: all 0.2s;
+                "
+                class="storage-mode-option"
+                data-mode="local"
+              >
+                <input
+                  type="radio"
+                  name="storageMode"
+                  value="local"
+                  style="margin-right: 8px"
+                />
+                <span style="font-size: 0.85em">📱 本地存储</span>
+              </label>
+              <label
+                style="
+                  display: flex;
+                  align-items: center;
+                  cursor: pointer;
+                  padding: 10px 10px;
+                  border: 2px solid #ddd;
+                  border-radius: 8px;
+                  flex: 1;
+                  transition: all 0.2s;
+                "
+                class="storage-mode-option"
+                data-mode="webdav"
+              >
+                <input
+                  type="radio"
+                  name="storageMode"
+                  value="webdav"
+                  style="margin-right: 8px"
+                />
+                <span style="font-size: 0.85em">☁️ 远程存储</span>
+              </label>
+            </div>
+            <p style="margin: 8px 0 0; font-size: 12px; color: #888">
+              本地存储：数据保存在浏览器中；远程存储：通过 WebDAV 同步到云端
+            </p>
+          </div>
+
+          <!-- WebDAV 配置 -->
+          <div
+            id="webdavConfigSection"
+            style="
+              display: none;
+              padding: 16px;
+              background: #f8f9fa;
+              border-radius: 8px;
+              margin-bottom: 10px;
+            "
+          >
+            <label
+              style="
+                display: block;
+                margin-bottom: 12px;
+                font-weight: 600;
+                color: #333;
+              "
+            >
+              ⚙️ WebDAV 配置
+            </label>
+            <div style="margin-bottom: 12px">
+              <label
+                style="
+                  display: block;
+                  margin-bottom: 4px;
+                  font-size: 13px;
+                  color: #555;
+                "
+                >服务器地址</label
+              >
+              <input
+                type="text"
+                id="webdavUrl"
+                placeholder="https://dav.example.com"
+                style="
+                  width: 100%;
+                  padding: 8px 12px;
+                  border: 1px solid #ddd;
+                  border-radius: 6px;
+                  font-size: 14px;
+                  box-sizing: border-box;
+                "
+              />
+            </div>
+            <div style="margin-bottom: 12px">
+              <label
+                style="
+                  display: block;
+                  margin-bottom: 4px;
+                  font-size: 13px;
+                  color: #555;
+                "
+                >用户名</label
+              >
+              <input
+                type="text"
+                id="webdavUsername"
+                placeholder="用户名"
+                style="
+                  width: 100%;
+                  padding: 8px 12px;
+                  border: 1px solid #ddd;
+                  border-radius: 6px;
+                  font-size: 14px;
+                  box-sizing: border-box;
+                "
+              />
+            </div>
+            <div style="margin-bottom: 12px">
+              <label
+                style="
+                  display: block;
+                  margin-bottom: 4px;
+                  font-size: 13px;
+                  color: #555;
+                "
+                >密码</label
+              >
+              <input
+                type="password"
+                id="webdavPassword"
+                placeholder="密码"
+                style="
+                  width: 100%;
+                  padding: 8px 12px;
+                  border: 1px solid #ddd;
+                  border-radius: 6px;
+                  font-size: 14px;
+                  box-sizing: border-box;
+                "
+              />
+            </div>
+            <div style="margin-bottom: 12px">
+              <label
+                style="
+                  display: block;
+                  margin-bottom: 4px;
+                  font-size: 13px;
+                  color: #555;
+                "
+                >存储路径</label
+              >
+              <input
+                type="text"
+                id="webdavPath"
+                placeholder="/openai-chat/"
+                style="
+                  width: 100%;
+                  padding: 8px 12px;
+                  border: 1px solid #ddd;
+                  border-radius: 6px;
+                  font-size: 14px;
+                  box-sizing: border-box;
+                "
+              />
+              <p style="margin: 4px 0 0; font-size: 11px; color: #888">
+                留空则使用默认路径 /openai-chat/
+              </p>
+            </div>
+            <button
+              type="button"
+              id="testWebdavBtn"
+              style="
+                width: 100%;
+                padding: 10px;
+                background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+                border: none;
+                border-radius: 6px;
+                font-size: 14px;
+                cursor: pointer;
+                font-weight: 500;
+              "
+            >
+              🔗 测试连接
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script>
@@ -1951,6 +2387,7 @@
             apiKey: '',
             messageInput: '',
             isLoading: false,
+            isShowSettingsModal: false,
             isSentForAWhile: false,
             errorMessage: '',
             selectedModel: '',
@@ -1974,7 +2411,15 @@
             searchRes: null,
             tomSelect: null,
             sidebarHashAdded: false, // 标记是否为侧边栏添加了hash
-            swalHashAdded: false // 标记是否为弹窗添加了hash
+            swalHashAdded: false, // 标记是否为弹窗添加了hash
+            // 存储模式相关
+            storageMode: 'local', // 'local' 或 'webdav'
+            webdavConfig: {
+              url: '',
+              username: '',
+              password: '',
+              path: '/openai-chat/'
+            }
           };
         },
         computed: {
@@ -2090,6 +2535,11 @@
         },
         async mounted() {
           this.initModels();
+
+          // 加载WebDAV配置
+          await window.openaiDB.loadWebDAVConfig();
+          this.storageMode = window.openaiDB.webdavEnabled ? 'webdav' : 'local';
+          this.webdavConfig = Object.assign({}, window.openaiDB.webdavConfig);
 
           // 初始化 IndexedDB
           await window.openaiDB.init();
@@ -2269,10 +2719,337 @@
             }
           },
 
+          // 打开设置弹窗
+          openSettingsModal() {
+            var template = this.$refs.settingsTemplate;
+            if (!template) return;
+            var htmlContent = template.innerHTML;
+
+            Swal.fire({
+              title: '⚙️ 设置',
+              html: htmlContent,
+              width: this.isMobile ? '95%' : '500px',
+              showCancelButton: true,
+              confirmButtonText: '保存',
+              cancelButtonText: '取消',
+              confirmButtonColor: '#5fbdbd',
+              allowOutsideClick: false,
+              showCloseButton: false,
+              reverseButtons: true,
+              didOpen: async () => {
+                this.isShowSettingsModal = true;
+                await this.$nextTick();
+                // 填充当前值
+                var apiKeyInput = $('#settingsApiKey');
+                if (apiKeyInput) apiKeyInput.value = this.apiKey || '';
+
+                var localRadio = $('input[name="storageMode"][value="local"]');
+                var webdavRadio = $(
+                  'input[name="storageMode"][value="webdav"]'
+                );
+                if (this.storageMode === 'webdav' && webdavRadio) {
+                  webdavRadio.checked = true;
+                } else if (localRadio) {
+                  localRadio.checked = true;
+                }
+
+                // 填充WebDAV配置
+                var urlInput = $('#webdavUrl');
+                var usernameInput = $('#webdavUsername');
+                var passwordInput = $('#webdavPassword');
+                var pathInput = $('#webdavPath');
+                if (urlInput) urlInput.value = this.webdavConfig.url || '';
+                if (usernameInput)
+                  usernameInput.value = this.webdavConfig.username || '';
+                if (passwordInput)
+                  passwordInput.value = this.webdavConfig.password || '';
+                if (pathInput)
+                  pathInput.value = this.webdavConfig.path || '/openai-chat/';
+
+                // 显示/隐藏WebDAV配置区域
+                var webdavSection = $('#webdavConfigSection');
+                if (webdavSection) {
+                  webdavSection.style.display =
+                    this.storageMode === 'webdav' ? 'block' : 'none';
+                }
+
+                // 更新选中状态样式
+                this.updateStorageModeStyle();
+
+                // 绑定存储模式切换事件
+                var radios = $$('input[name="storageMode"]');
+                radios.forEach(radio => {
+                  radio.addEventListener('change', () => {
+                    var webdavSection = $('#webdavConfigSection');
+                    if (webdavSection) {
+                      webdavSection.style.display =
+                        radio.value === 'webdav' ? 'block' : 'none';
+                    }
+                    this.updateStorageModeStyle();
+                  });
+                });
+
+                // 绑定测试按钮事件
+                var testBtn = $('#testWebdavBtn');
+                if (testBtn) {
+                  testBtn.addEventListener('click', () => {
+                    this.testWebDAVFromModal();
+                  });
+                }
+              },
+              preConfirm: () => {
+                console.log('pre-confirm');
+                const isValid = this.validateAndSaveSettings();
+                this.isShowSettingsModal = false;
+                return isValid;
+              }
+            });
+          },
+
+          // 更新存储模式选项样式
+          updateStorageModeStyle() {
+            var options = $$('.storage-mode-option');
+            options.forEach(option => {
+              var radio = option.querySelector('input[type="radio"]');
+              if (radio && radio.checked) {
+                option.style.borderColor = '#5fbdbd';
+                option.style.background = 'rgba(95, 189, 189, 0.1)';
+              } else {
+                option.style.borderColor = '#ddd';
+                option.style.background = 'transparent';
+              }
+            });
+          },
+
+          // 从弹窗中测试WebDAV连接
+          async testWebDAVFromModal() {
+            var urlInput = $('#webdavUrl');
+            var usernameInput = $('#webdavUsername');
+            var passwordInput = $('#webdavPassword');
+            var pathInput = $('#webdavPath');
+            var testBtn = $('#testWebdavBtn');
+            var config = {
+              url: urlInput ? urlInput.value.trim() : '',
+              username: usernameInput ? usernameInput.value.trim() : '',
+              password: passwordInput ? passwordInput.value : '',
+              path: (pathInput ? pathInput.value.trim() : '') || '/openai-chat/'
+            };
+
+            // 基本验证
+            if (!config.url) {
+              this.showToast('请输入服务器地址', 'error');
+              return;
+            }
+            if (!config.username) {
+              this.showToast('请输入用户名', 'error');
+              return;
+            }
+            if (!config.password) {
+              this.showToast('请输入密码', 'error');
+              return;
+            }
+
+            // 显示测试中状态
+            if (testBtn) {
+              testBtn.disabled = true;
+              testBtn.textContent = '⏳ 测试中...';
+            }
+
+            var result = await window.openaiDB.testWebDAVConnection(config);
+
+            if (testBtn) {
+              testBtn.disabled = false;
+              testBtn.textContent = '🔗 测试连接';
+            }
+
+            if (result.success) {
+              this.showToast('连接成功！', 'success');
+            } else {
+              this.showToast('连接失败: ' + result.error, 'error');
+            }
+          },
+
+          // 显示Toast提示（不影响Swal弹窗）
+          showToast(message, icon) {
+            // 创建toast容器（如果不存在）
+            var container = $('#custom-toast-container');
+            if (!container) {
+              container = document.createElement('div');
+              container.id = 'custom-toast-container';
+              container.style.cssText =
+                'position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 99999; display: flex; flex-direction: column; align-items: center; gap: 10px; pointer-events: none;';
+              document.body.appendChild(container);
+            }
+
+            // 创建toast元素
+            var toast = document.createElement('div');
+            toast.style.cssText =
+              'padding: 12px 20px; border-radius: 8px; background: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 8px; font-size: 14px; opacity: 0; transform: translateY(-10px); transition: all 0.3s ease; pointer-events: auto;';
+
+            // 根据icon类型设置颜色和图标
+            var iconEmoji = '💬';
+            var bgColor = '#fff';
+            var borderColor = '#e0e0e0';
+            if (icon === 'success') {
+              iconEmoji = '✅';
+              borderColor = '#5fbdbd';
+            } else if (icon === 'error') {
+              iconEmoji = '❌';
+              borderColor = '#e74c3c';
+            } else if (icon === 'warning') {
+              iconEmoji = '⚠️';
+              borderColor = '#f39c12';
+            } else if (icon === 'info') {
+              iconEmoji = 'ℹ️';
+              borderColor = '#3498db';
+            }
+            toast.style.borderLeft = '4px solid ' + borderColor;
+
+            toast.innerHTML =
+              '<span style="font-size: 16px;">' +
+              iconEmoji +
+              '</span><span>' +
+              message +
+              '</span>';
+            container.appendChild(toast);
+
+            // 显示动画
+            requestAnimationFrame(() => {
+              toast.style.opacity = '1';
+              toast.style.transform = 'translateY(0)';
+            });
+
+            // 3秒后隐藏并移除
+            this.sleep(3000).then(() => {
+              toast.style.opacity = '0';
+              toast.style.transform = 'translateY(-10px)';
+              this.sleep(300).then(() => {
+                if (toast.parentNode) {
+                  toast.parentNode.removeChild(toast);
+                }
+              });
+            });
+          },
+
+          // 验证并保存设置
+          async validateAndSaveSettings() {
+            var apiKeyInput = $('#settingsApiKey');
+            var apiKey = apiKeyInput ? apiKeyInput.value.trim() : '';
+
+            var storageModeRadio = $('input[name="storageMode"]:checked');
+            var storageMode = storageModeRadio
+              ? storageModeRadio.value
+              : 'local';
+
+            // API Key 验证
+            if (!apiKey) {
+              this.showToast('请输入 API Key', 'error');
+              return false;
+            }
+
+            // 如果选择了WebDAV，验证配置
+            if (storageMode === 'webdav') {
+              var urlInput = $('#webdavUrl');
+              var usernameInput = $('#webdavUsername');
+              var passwordInput = $('#webdavPassword');
+              var pathInput = $('#webdavPath');
+
+              var webdavConfig = {
+                url: urlInput ? urlInput.value.trim() : '',
+                username: usernameInput ? usernameInput.value.trim() : '',
+                password: passwordInput ? passwordInput.value : '',
+                path:
+                  (pathInput ? pathInput.value.trim() : '') || '/openai-chat/'
+              };
+
+              // WebDAV必填项验证
+              if (!webdavConfig.url) {
+                this.showToast('请输入 WebDAV 服务器地址', 'error');
+                return false;
+              }
+              if (!webdavConfig.username) {
+                this.showToast('请输入 WebDAV 用户名', 'error');
+                return false;
+              }
+              if (!webdavConfig.password) {
+                this.showToast('请输入 WebDAV 密码', 'error');
+                return false;
+              }
+
+              // WebDAV连通性测试
+              Swal.showLoading();
+              var result = await window.openaiDB.testWebDAVConnection(
+                webdavConfig
+              );
+              if (!result.success) {
+                Swal.hideLoading();
+                this.showToast('WebDAV 连接失败: ' + result.error, 'error');
+                return false;
+              }
+
+              // 保存WebDAV配置
+              this.webdavConfig = webdavConfig;
+              await window.openaiDB.saveWebDAVConfig(true, webdavConfig);
+              this.storageMode = 'webdav';
+            } else {
+              // 本地存储模式
+              await window.openaiDB.saveWebDAVConfig(false, this.webdavConfig);
+              this.storageMode = 'local';
+            }
+
+            // 保存API Key
+            this.apiKey = apiKey;
+            await this.saveApiKey();
+
+            // 如果切换了存储模式，需要重新加载数据
+            var oldMode = window.openaiDB.webdavEnabled ? 'webdav' : 'local';
+            if (oldMode !== storageMode) {
+              // 重新加载会话数据
+              this.showToast('存储模式已切换，正在重新加载数据...', 'info');
+              await this.loadSessions();
+            }
+
+            this.showToast('设置已保存', 'success');
+            return true;
+          },
+
+          // 加载会话数据（独立方法）
+          async loadSessions() {
+            var savedSessions = await window.openaiDB.getItem(
+              'openai_sessions'
+            );
+            if (savedSessions) {
+              var parsed = JSON.parse(savedSessions);
+              var migratedSessions = this.migrateSessionData(parsed);
+              if (migratedSessions) {
+                this.sessions = migratedSessions;
+              } else {
+                this.sessions = parsed;
+              }
+            } else {
+              this.sessions = [];
+            }
+
+            // 加载当前会话ID
+            var savedCurrentId = await window.openaiDB.getItem(
+              'openai_current_session'
+            );
+            if (
+              savedCurrentId &&
+              this.sessions.find(s => s.id === savedCurrentId)
+            ) {
+              this.currentSessionId = savedCurrentId;
+            } else if (this.sessions.length > 0) {
+              this.currentSessionId = this.sessions[0].id;
+            } else {
+              this.createNewSession();
+            }
+          },
+
           initTomSelect() {
             if (this.tomSelect) return;
             if (this.availableModels.length <= 10) return;
-            const el = document.getElementById('selectedModel');
+            const el = $('#selectedModel');
             if (!el) return;
             const config = {
               plugins: ['dropdown_input'],
@@ -2307,9 +3084,7 @@
               },
               onDelete: () => false,
               onInitialize: () => {
-                const input = document.querySelector(
-                  '.dropdown-input-wrap input'
-                );
+                const input = $('.dropdown-input-wrap input');
                 if (!input) return;
                 input.style.paddingLeft = '12px';
                 input.style.paddingRight = '12px';
@@ -3409,10 +4184,11 @@
           },
 
           copyToClipboard(text) {
-            text = text.replace(
-              /\\[([0-9]+)\\]\\(javascript:void\\(0\\)\\)/g,
-              '$1'
+            const regexp = new RegExp(
+              '\\[([0-9]+)\\]\\(javascript:void\\(0\\)\\)',
+              'g'
             );
+            text = text.replace(regexp, '$1');
             navigator.clipboard
               .writeText(text)
               .then(() => {
@@ -3486,7 +4262,7 @@
           },
 
           async shareSession() {
-            const sessionContent = document.querySelector('.session-content');
+            const sessionContent = $('.session-content');
             if (!sessionContent) {
               this.showSwal({
                 title: '截图失败',
@@ -4294,9 +5070,11 @@
                 .filter(i => i && i !== 'INVALID')
                 .map(i => ({ url: i }));
               // 恢复文本附件到上传列表
-              this.uploadedPlaintexts = (lastUserMsg.plaintexts || []).map(item => {
-                return { name: item.name, content: item.content };
-              });
+              this.uploadedPlaintexts = (lastUserMsg.plaintexts || []).map(
+                item => {
+                  return { name: item.name, content: item.content };
+                }
+              );
               // 删除最后一条用户消息
               session.messages = session.messages.slice(0, lastUserMsgIdx);
               this.sendMessage();
