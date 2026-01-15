@@ -4180,8 +4180,13 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
               preConfirm: () => {
                 console.log('pre-confirm');
                 const isValid = this.validateAndSaveSettings();
-                this.isShowSettingsModal = false;
+                if (isValid) {
+                  this.isShowSettingsModal = false;
+                }
                 return isValid;
+              },
+              dismiss: () => {
+                this.isShowSettingsModal = false;
               }
             });
           },
