@@ -3779,7 +3779,7 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
                 color: #333;
               "
             >
-              ⚙️ WebDAV 配置
+              WebDAV 配置
             </label>
             <div style="margin-bottom: 12px">
               <label
