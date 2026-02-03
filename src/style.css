@@ -1117,8 +1117,8 @@ textarea::placeholder {
 }
 
 .rendered-content details[open] summary {
-  margin-bottom: 0.5em;
   padding-bottom: 0.5em;
+  margin-bottom: 0.75em;
   border-bottom: 1px solid #e5e7eb;
 }
 
