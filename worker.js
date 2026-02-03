@@ -932,9 +932,8 @@ function getLiteModelId(modelIds) {
     .map(i => i.split('=')[0].trim())
     .filter(i => i);
   const parts = [
-    'qwen3-235b',
-    'qwen3-next',
     'deepseek-v',
+    'qwen3-next',
     '-oss-',
     '-mini',
     'qwen3-max',
