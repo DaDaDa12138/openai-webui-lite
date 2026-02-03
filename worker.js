@@ -4085,7 +4085,11 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
           const originalHtmlRenderer = renderer.html.bind(renderer);
           renderer.html = function (text) {
             // marked 会自动处理代码块内的内容，这里只处理普通文本
-            const escaped = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            // 有条件的转义：如果 < 后面不是 a, br, blockquote, details, summary 标签，才进行转义
+            const escaped = text.replace(
+              /<(?!\\/?(a|br|blockquote|details|summary)[\\s>])/gi,
+              '&lt;'
+            );
             return originalHtmlRenderer(escaped);
           };
 
@@ -6305,6 +6309,7 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
               var reader = response.body.getReader();
               var decoder = new TextDecoder();
               var buffer = '';
+              var isInThinking = false; // 标记是否处于思考模式
 
               while (true) {
                 var readResult = await reader.read();
@@ -6328,8 +6333,40 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
                         : trimmedLine.slice(5);
                       var data = JSON.parse(jsonStr);
 
+                      // 处理 reasoning_content (思考内容)
+                      if (
+                        data.choices &&
+                        data.choices[0].delta.reasoning_content
+                      ) {
+                        var reasoningDelta =
+                          data.choices[0].delta.reasoning_content;
+                        if (reasoningDelta) {
+                          var shouldScroll = !this.streamingContent;
+                          // 如果还未进入思考模式，添加开始标签
+                          if (!isInThinking) {
+                            this.streamingContent +=
+                              '<details class="thinking" open style="font-size: 0.75em">\\n<summary>思考内容</summary>\\n\\n';
+                            isInThinking = true;
+                          }
+                          this.streamingContent += reasoningDelta;
+                          if (shouldScroll) {
+                            this.scrollToBottom();
+                          }
+                        }
+                      }
+
+                      // 处理 content (正式回答)
                       if (data.choices && data.choices[0].delta.content) {
                         var delta = data.choices[0].delta.content;
+                        // 如果之前在思考模式，现在要输出正式内容了，先关闭思考块
+                        if (isInThinking) {
+                          this.streamingContent += '\\n</details>\\n\\n';
+                          this.streamingContent.replace(
+                            '<details class="thinking" open',
+                            '<details class="thinking"'
+                          );
+                          isInThinking = false;
+                        }
                         var regThinkStart = new RegExp('<think>');
                         var regThinkEnd = new RegExp('</think>');
                         delta = delta
