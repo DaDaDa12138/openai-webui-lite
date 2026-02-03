@@ -932,6 +932,7 @@ function getLiteModelId(modelIds) {
     .map(i => i.split('=')[0].trim())
     .filter(i => i);
   const parts = [
+    'qwen3-235b',
     'qwen3-next',
     'deepseek-v',
     '-oss-',
@@ -4081,18 +4082,14 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
           // 初始化 IndexedDB
           await window.openaiDB.init();
 
-          const renderer = new marked.Renderer();
-
-          const originalTextRenderer = renderer.text.bind(renderer);
-          renderer.text = function (text) {
-            // marked 会自动处理代码块内的内容，这里只处理普通文本
-            const escaped = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            return originalTextRenderer(escaped);
-          };
-
           // 配置 marked
           marked.setOptions({
-            renderer,
+            renderer: {
+              // 转义 HTML 标签，防止 XSS
+              html(html) {
+                return html.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+              }
+            },
             breaks: true, // 支持 GFM 换行
             gfm: true, // 启用 GitHub Flavored Markdown
             tables: true, // 支持表格
