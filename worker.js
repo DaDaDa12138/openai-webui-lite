@@ -1416,6 +1416,7 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
     <script src="https://unpkg.com/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
 
     <script src="https://unpkg.com/vue@3.5.22/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/fflate@0.8.2/umd/index.js"></script>
     <script src="https://unpkg.com/sweetalert2@11.26.3/dist/sweetalert2.all.js"></script>
     <script src="https://unpkg.com/marked@12.0.0/marked.min.js"></script>
     <script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -2721,7 +2722,21 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
               headers: headers
             });
             if (response.status === 200) {
-              return await response.text();
+              // 如果是 .gz 文件，解压后返回
+              if (filename.endsWith('.gz')) {
+                var arrayBuffer = await response.arrayBuffer();
+                var compressed = new Uint8Array(arrayBuffer);
+                try {
+                  var decompressed = fflate.gunzipSync(compressed);
+                  var text = fflate.strFromU8(decompressed);
+                  return text;
+                } catch (e) {
+                  console.error('WebDAV 解压失败:', e);
+                  return null;
+                }
+              } else {
+                return await response.text();
+              }
             } else if (response.status === 404) {
               return null;
             } else {
@@ -2738,14 +2753,30 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
         async webdavPut(filename, content) {
           var targetPath = this.webdavConfig.path + filename;
           var proxyUrl = this._buildProxyUrl(targetPath);
+          var body = content;
+          var contentType = 'application/json';
+
+          // 如果是 .gz 文件，压缩后传输
+          if (filename.endsWith('.gz')) {
+            try {
+              var uint8Array = fflate.strToU8(content);
+              var compressed = fflate.gzipSync(uint8Array, { level: 9 });
+              body = compressed;
+              contentType = 'application/gzip';
+            } catch (e) {
+              console.error('WebDAV 压缩失败:', e);
+              return false;
+            }
+          }
+
           var headers = this._buildProxyHeaders(this.webdavConfig, {
-            'Content-Type': 'application/json'
+            'Content-Type': contentType
           });
           try {
             var response = await fetch(proxyUrl, {
               method: 'PUT',
               headers: headers,
-              body: content
+              body: body
             });
             return (
               response.status === 200 ||
@@ -2766,9 +2797,9 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
           }
           this._webdavSyncTimer = setTimeout(async () => {
             if (this._pendingWebdavData) {
-              console.log('[WebDAV] 同步数据到远程...');
+              console.log('[WebDAV] 同步数据到远程（压缩）...');
               var success = await this.webdavPut(
-                'sessions.json',
+                'sessions.json.gz',
                 this._pendingWebdavData
               );
               if (!success) {
@@ -2789,8 +2820,8 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
             this._webdavSyncTimer = null;
           }
           if (this._pendingWebdavData && this.webdavEnabled) {
-            console.log('[WebDAV] 立即同步数据...');
-            await this.webdavPut('sessions.json', this._pendingWebdavData);
+            console.log('[WebDAV] 立即同步数据（压缩）...');
+            await this.webdavPut('sessions.json.gz', this._pendingWebdavData);
             this._pendingWebdavData = null;
           }
         }
@@ -2845,11 +2876,11 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
               // 120秒内的缓存有效
               const timestamp = Math.floor(Date.now() / 1000 / 120);
               var remoteData = await this.webdavGet(
-                'sessions.json?v=' + timestamp
+                'sessions.json.gz?v=' + timestamp
               );
               if (remoteData !== null) {
                 if (window.app) {
-                  window.app.showToast('远程数据已加载', 'success');
+                  window.app.showToast('远程数据已加载（已解压）', 'success');
                 }
                 return remoteData;
               }
