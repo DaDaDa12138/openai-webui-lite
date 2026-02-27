@@ -710,13 +710,11 @@ ${truncatedAnswer}
     // 获取请求体
     let requestBody = null;
     if (!['GET', 'HEAD', 'OPTIONS'].includes(apiMethod)) {
-      requestBody = await request.text();
+      // 使用 arrayBuffer 而不是 text，保持二进制数据完整性
+      requestBody = await request.arrayBuffer();
       // 对于有内容的请求，设置 Content-Length
-      if (requestBody) {
-        forwardHeaders.set(
-          'Content-Length',
-          new TextEncoder().encode(requestBody).length.toString()
-        );
+      if (requestBody && requestBody.byteLength > 0) {
+        forwardHeaders.set('Content-Length', requestBody.byteLength.toString());
       }
     }
 
