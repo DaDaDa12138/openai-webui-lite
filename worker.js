@@ -2982,13 +2982,12 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
                 'sessions.json.gz?v=' + timestamp
               );
               if (remoteData !== null) {
-                if (window.app) {
-                  window.app.showToast('远程数据已加载（已解压）', 'success');
-                }
                 return remoteData;
               }
               // 如果远程没有数据，回退到本地
               console.log('WebDAV无数据，尝试从本地读取');
+              if (window.app)
+                window.app.showToast('WebDAV无数据，尝试从本地读取', 'error');
             } finally {
               if (window.app) window.app.isLoadingRemoteSessions = false;
             }
