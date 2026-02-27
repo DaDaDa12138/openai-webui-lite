@@ -2716,6 +2716,15 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
           var targetPath = this.webdavConfig.path + filename;
           var proxyUrl = this._buildProxyUrl(targetPath);
           var headers = this._buildProxyHeaders(this.webdavConfig);
+
+          // 对于 .gz 文件，添加明确的 Accept 头指示需要二进制数据
+          var filenameWithoutQuery = filename.split('?')[0];
+          if (filenameWithoutQuery.endsWith('.gz')) {
+            headers['Accept'] =
+              'application/gzip, application/octet-stream, */*';
+            headers['X-Binary-Response'] = 'true'; // 提示代理保持二进制数据完整性
+          }
+
           try {
             var response = await fetch(proxyUrl, {
               method: 'GET',
@@ -2723,7 +2732,6 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
             });
             if (response.status === 200) {
               // 如果是 .gz 文件，尝试解压
-              var filenameWithoutQuery = filename.split('?')[0];
               if (filenameWithoutQuery.endsWith('.gz')) {
                 try {
                   // 读取为 arrayBuffer
