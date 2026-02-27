@@ -2732,8 +2732,19 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
                   var text = fflate.strFromU8(decompressed);
                   return text;
                 } catch (e) {
-                  console.error('WebDAV 解压失败:', e);
-                  return null;
+                  console.warn(
+                    'WebDAV 解压失败，尝试直接读取为文本:',
+                    e.message
+                  );
+                  // 可能已被浏览器或CDN自动解压，尝试直接读取为文本
+                  try {
+                    var textDecoder = new TextDecoder('utf-8');
+                    var decodedText = textDecoder.decode(compressed);
+                    return decodedText;
+                  } catch (decodeError) {
+                    console.error('WebDAV 文本解码也失败:', decodeError);
+                    return null;
+                  }
                 }
               } else {
                 return await response.text();
