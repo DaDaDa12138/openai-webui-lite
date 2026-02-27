@@ -2722,8 +2722,9 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
               headers: headers
             });
             if (response.status === 200) {
-              // 如果是 .gz 文件，解压后返回
-              if (filename.endsWith('.gz')) {
+              // 如果是 .gz 文件，解压后返回（需要去掉查询参数后检查）
+              var filenameWithoutQuery = filename.split('?')[0];
+              if (filenameWithoutQuery.endsWith('.gz')) {
                 var arrayBuffer = await response.arrayBuffer();
                 var compressed = new Uint8Array(arrayBuffer);
                 try {
