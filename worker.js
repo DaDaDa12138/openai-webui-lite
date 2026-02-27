@@ -2730,45 +2730,75 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
                   var arrayBuffer = await response.arrayBuffer();
                   var compressed = new Uint8Array(arrayBuffer);
 
-                  console.log('[WebDAV] 接收数据大小:', compressed.length,
-                    '前4字节:', Array.from(compressed.slice(0, 4)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
+                  console.log(
+                    '[WebDAV] 接收数据大小:',
+                    compressed.length,
+                    '前4字节:',
+                    Array.from(compressed.slice(0, 4))
+                      .map(b => '0x' + b.toString(16).padStart(2, '0'))
+                      .join(' ')
+                  );
 
                   // 检查 gzip 魔数（0x1f 0x8b）
-                  if (compressed.length >= 2 && compressed[0] === 0x1f && compressed[1] === 0x8b) {
+                  if (
+                    compressed.length >= 2 &&
+                    compressed[0] === 0x1f &&
+                    compressed[1] === 0x8b
+                  ) {
                     // 是 gzip 数据，尝试解压
                     try {
                       var decompressed = fflate.gunzipSync(compressed);
                       var text = fflate.strFromU8(decompressed);
-                      console.log('[WebDAV] 成功解压 gzip 数据:', compressed.length, '→', text.length, '字符');
+                      console.log(
+                        '[WebDAV] 成功解压 gzip 数据:',
+                        compressed.length,
+                        '→',
+                        text.length,
+                        '字符'
+                      );
                       return text;
                     } catch (unzipError) {
-                      console.error('[WebDAV] gzip 解压失败:', unzipError.message);
+                      console.error(
+                        '[WebDAV] gzip 解压失败:',
+                        unzipError.message
+                      );
                       return null;
                     }
                   } else {
                     // 不是 gzip 数据，可能文件损坏或已被处理
-                    console.error('[WebDAV] 数据不是有效的 gzip 格式，文件可能损坏');
+                    console.error(
+                      '[WebDAV] 数据不是有效的 gzip 格式，文件可能损坏'
+                    );
                     // 尝试作为普通文本解码（可能已被某个中间层解压）
                     try {
-                      var textDecoder = new TextDecoder('utf-8', { fatal: false });
+                      var textDecoder = new TextDecoder('utf-8', {
+                        fatal: false
+                      });
                       var text = textDecoder.decode(compressed);
                       // 检查是否包含有效的 JSON 起始字符
-                      if (text.trimStart().startsWith('[') || text.trimStart().startsWith('{')) {
-                        console.log('[WebDAV] 数据似乎已被自动解压，作为文本返回');
+                      if (
+                        text.trimStart().startsWith('[') ||
+                        text.trimStart().startsWith('{')
+                      ) {
+                        console.log(
+                          '[WebDAV] 数据似乎已被自动解压，作为文本返回'
+                        );
                         return text;
                       } else {
                         console.error('[WebDAV] 解码后不是有效的 JSON 文本');
                         return null;
                       }
                     } catch (decodeError) {
-                      console.error('[WebDAV] UTF-8 解码失败:', decodeError.message);
+                      console.error(
+                        '[WebDAV] UTF-8 解码失败:',
+                        decodeError.message
+                      );
                       return null;
                     }
                   }
                 } catch (e) {
                   console.error('[WebDAV] 读取文件失败:', e.message);
                   return null;
-                }
                 }
               } else {
                 return await response.text();
