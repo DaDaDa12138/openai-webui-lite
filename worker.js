@@ -2722,34 +2722,49 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
               headers: headers
             });
             if (response.status === 200) {
-              // 如果是 .gz 文件，解压后返回（需要去掉查询参数后检查）
+              // 如果是 .gz 文件，尝试解压
               var filenameWithoutQuery = filename.split('?')[0];
               if (filenameWithoutQuery.endsWith('.gz')) {
-                var arrayBuffer = await response.arrayBuffer();
-                var compressed = new Uint8Array(arrayBuffer);
+                // 克隆响应以便多次读取
+                var responseClone = response.clone();
 
-                // 检查是否是真正的 gzip 数据（魔数：0x1f 0x8b）
-                var isGzip =
-                  compressed.length >= 2 &&
-                  compressed[0] === 0x1f &&
-                  compressed[1] === 0x8b;
+                try {
+                  // 尝试读取并解压 gzip 数据
+                  var arrayBuffer = await response.arrayBuffer();
+                  var compressed = new Uint8Array(arrayBuffer);
 
-                if (isGzip) {
-                  try {
+                  // 检查 gzip 魔数（0x1f 0x8b）
+                  if (
+                    compressed.length >= 2 &&
+                    compressed[0] === 0x1f &&
+                    compressed[1] === 0x8b
+                  ) {
                     var decompressed = fflate.gunzipSync(compressed);
                     var text = fflate.strFromU8(decompressed);
-                    console.log('[WebDAV] 成功解压 gzip 数据');
+                    console.log(
+                      '[WebDAV] 成功解压 gzip 数据，大小:',
+                      compressed.length,
+                      '→',
+                      text.length
+                    );
                     return text;
-                  } catch (e) {
-                    console.error('WebDAV gzip 解压失败:', e);
+                  } else {
+                    // 不是 gzip，直接尝试用克隆的响应读取文本
+                    console.log('[WebDAV] 不是 gzip 格式，使用浏览器原生解码');
+                    return await responseClone.text();
+                  }
+                } catch (e) {
+                  // 解压或解码失败，尝试用克隆的响应读取文本
+                  console.warn(
+                    '[WebDAV] 数据处理失败，回退到原生文本读取:',
+                    e.message
+                  );
+                  try {
+                    return await responseClone.text();
+                  } catch (textError) {
+                    console.error('[WebDAV] 原生文本读取也失败:', textError);
                     return null;
                   }
-                } else {
-                  // 不是 gzip 数据，可能已被自动解压，直接解码为文本
-                  console.log('[WebDAV] 文件不是 gzip 格式，直接读取为文本');
-                  var textDecoder = new TextDecoder('utf-8');
-                  var decodedText = textDecoder.decode(compressed);
-                  return decodedText;
                 }
               } else {
                 return await response.text();
