@@ -3788,7 +3788,7 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
       <div ref="aboutTemplate" style="display: none">
         <div style="max-height: 70vh; overflow-y: auto; text-align: left">
           <div style="text-align: left; padding: 10px">
-            <h3 style="margin: 0 0 10px; color: #333">✨ 应用简介</h3>
+            <h3 style="margin: 0 0 10px; color: #333" ondblclick="location.reload()">✨ 应用简介</h3>
             <p style="line-height: 1.6; color: #666">
               这是一个简单易用的 OpenAI API 代理服务，基于 Deno Deploy /
               Cloudflare Workers 部署。 只需要一个域名和 OpenAI API
