@@ -2827,7 +2827,23 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
             try {
               var uint8Array = fflate.strToU8(content);
               var compressed = fflate.gzipSync(uint8Array, { level: 6 });
-              body = compressed;
+
+              console.log(
+                '[WebDAV] 压缩数据:',
+                uint8Array.length,
+                '→',
+                compressed.length,
+                '字节，压缩率:',
+                ((1 - compressed.length / uint8Array.length) * 100).toFixed(1) +
+                  '%',
+                '前4字节:',
+                Array.from(compressed.slice(0, 4))
+                  .map(b => '0x' + b.toString(16).padStart(2, '0'))
+                  .join(' ')
+              );
+
+              // 确保作为 Blob 上传，保持二进制数据完整性
+              body = new Blob([compressed], { type: 'application/gzip' });
               contentType = 'application/gzip';
             } catch (e) {
               console.error('WebDAV 压缩失败:', e);
@@ -2844,11 +2860,14 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
               headers: headers,
               body: body
             });
-            return (
+            var success =
               response.status === 200 ||
               response.status === 201 ||
-              response.status === 204
-            );
+              response.status === 204;
+            if (success && filename.endsWith('.gz')) {
+              console.log('[WebDAV] gzip 文件上传成功');
+            }
+            return success;
           } catch (e) {
             console.error('WebDAV PUT 错误:', e);
             return false;
