@@ -2573,6 +2573,10 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
         min-height: 1.5em;
       }
       
+      .streaming-answer > blockquote:first-child {
+        font-size: 0.75em;
+      }
+      
 </style>
     <script>
       var isWechat = new RegExp('wechat', 'i').test(window.navigator.userAgent);

@@ -1130,3 +1130,7 @@ textarea::placeholder {
 .streaming-answer {
   min-height: 1.5em;
 }
+
+.streaming-answer > blockquote:first-child {
+  font-size: 0.75em;
+}
