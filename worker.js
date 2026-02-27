@@ -766,6 +766,18 @@ ${truncatedAnswer}
       // 移除 WWW-Authenticate 头，避免浏览器弹出原生认证框
       responseHeaders.delete('WWW-Authenticate');
 
+      // 对于二进制内容（gzip），确保 Content-Type 正确且禁用自动压缩
+      const contentType = responseHeaders.get('Content-Type');
+      if (
+        contentType &&
+        (contentType.includes('gzip') || contentType.includes('octet-stream'))
+      ) {
+        // 明确告知 Cloudflare 不要对二进制数据进行额外处理
+        responseHeaders.set('Cache-Control', 'no-transform');
+        // 确保 Content-Encoding 不被误设置
+        responseHeaders.delete('Content-Encoding');
+      }
+
       return new Response(webdavResponse.body, {
         status: webdavResponse.status,
         statusText: webdavResponse.statusText,
