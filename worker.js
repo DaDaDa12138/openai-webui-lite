@@ -2727,24 +2727,29 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
               if (filenameWithoutQuery.endsWith('.gz')) {
                 var arrayBuffer = await response.arrayBuffer();
                 var compressed = new Uint8Array(arrayBuffer);
-                try {
-                  var decompressed = fflate.gunzipSync(compressed);
-                  var text = fflate.strFromU8(decompressed);
-                  return text;
-                } catch (e) {
-                  console.warn(
-                    'WebDAV 解压失败，尝试直接读取为文本:',
-                    e.message
-                  );
-                  // 可能已被浏览器或CDN自动解压，尝试直接读取为文本
+
+                // 检查是否是真正的 gzip 数据（魔数：0x1f 0x8b）
+                var isGzip =
+                  compressed.length >= 2 &&
+                  compressed[0] === 0x1f &&
+                  compressed[1] === 0x8b;
+
+                if (isGzip) {
                   try {
-                    var textDecoder = new TextDecoder('utf-8');
-                    var decodedText = textDecoder.decode(compressed);
-                    return decodedText;
-                  } catch (decodeError) {
-                    console.error('WebDAV 文本解码也失败:', decodeError);
+                    var decompressed = fflate.gunzipSync(compressed);
+                    var text = fflate.strFromU8(decompressed);
+                    console.log('[WebDAV] 成功解压 gzip 数据');
+                    return text;
+                  } catch (e) {
+                    console.error('WebDAV gzip 解压失败:', e);
                     return null;
                   }
+                } else {
+                  // 不是 gzip 数据，可能已被自动解压，直接解码为文本
+                  console.log('[WebDAV] 文件不是 gzip 格式，直接读取为文本');
+                  var textDecoder = new TextDecoder('utf-8');
+                  var decodedText = textDecoder.decode(compressed);
+                  return decodedText;
                 }
               } else {
                 return await response.text();
