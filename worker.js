@@ -2580,8 +2580,8 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
       /* WebDAV 状态指示灯 */
       .webdav-status-indicator {
         position: absolute;
-        top: 12px;
-        right: 12px;
+        top: 8px;
+        right: 8px;
         display: flex;
         gap: 6px;
         z-index: 10;
