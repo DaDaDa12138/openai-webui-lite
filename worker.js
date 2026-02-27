@@ -2577,6 +2577,45 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
         font-size: 0.85em;
       }
       
+      /* WebDAV 状态指示灯 */
+      .webdav-status-indicator {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        display: flex;
+        gap: 6px;
+        z-index: 10;
+      }
+      
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+      
+      .status-dot.downloading {
+        background-color: #10b981;
+        box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+      }
+      
+      .status-dot.uploading {
+        background-color: #f59e0b;
+        box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+      }
+      
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.5;
+          transform: scale(0.85);
+        }
+      }
+      
 </style>
     <script>
       var isWechat = new RegExp('wechat', 'i').test(window.navigator.userAgent);
@@ -2727,6 +2766,9 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
 
         // WebDAV 读取文件
         async webdavGet(filename) {
+          // 设置下载状态
+          if (window.app) window.app.isWebdavDownloading = true;
+
           var targetPath = this.webdavConfig.path + filename;
           var proxyUrl = this._buildProxyUrl(targetPath);
           var headers = this._buildProxyHeaders(this.webdavConfig);
@@ -2834,11 +2876,17 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
           } catch (e) {
             console.error('WebDAV GET 错误:', e);
             return null;
+          } finally {
+            // 清除下载状态
+            if (window.app) window.app.isWebdavDownloading = false;
           }
         }
 
         // WebDAV 写入文件
         async webdavPut(filename, content) {
+          // 设置上传状态
+          if (window.app) window.app.isWebdavUploading = true;
+
           var targetPath = this.webdavConfig.path + filename;
           var proxyUrl = this._buildProxyUrl(targetPath);
           var body = content;
@@ -2893,6 +2941,9 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
           } catch (e) {
             console.error('WebDAV PUT 错误:', e);
             return false;
+          } finally {
+            // 清除上传状态
+            if (window.app) window.app.isWebdavUploading = false;
           }
         }
 
@@ -3250,6 +3301,19 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
         <div class="main-chat" v-show="true" v-cloak style="display: none">
           <!-- 头部 -->
           <div class="header">
+            <!-- WebDAV 状态指示灯 -->
+            <div class="webdav-status-indicator">
+              <span
+                v-if="isWebdavDownloading"
+                class="status-dot downloading"
+                title="正在从 WebDAV 下载"
+              ></span>
+              <span
+                v-if="isWebdavUploading"
+                class="status-dot uploading"
+                title="正在上传到 WebDAV"
+              ></span>
+            </div>
             <h2 style="cursor: pointer">
               <div class="brand" @click="showAbout">
                 <img
@@ -3788,7 +3852,12 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
       <div ref="aboutTemplate" style="display: none">
         <div style="max-height: 70vh; overflow-y: auto; text-align: left">
           <div style="text-align: left; padding: 10px">
-            <h3 style="margin: 0 0 10px; color: #333" ondblclick="location.reload()">✨ 应用简介</h3>
+            <h3
+              style="margin: 0 0 10px; color: #333"
+              ondblclick="location.reload()"
+            >
+              ✨ 应用简介
+            </h3>
             <p style="line-height: 1.6; color: #666">
               这是一个简单易用的 OpenAI API 代理服务，基于 Deno Deploy /
               Cloudflare Workers 部署。 只需要一个域名和 OpenAI API
@@ -4120,7 +4189,10 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
               username: '',
               password: '',
               path: '/openai-chat/'
-            }
+            },
+            // WebDAV 状态指示
+            isWebdavUploading: false,
+            isWebdavDownloading: false
           };
         },
         computed: {
