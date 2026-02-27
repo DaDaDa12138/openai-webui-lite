@@ -2573,7 +2573,7 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
         min-height: 1.5em;
       }
       
-      .streaming-answer > blockquote:first-child {
+      .streaming-answer > blockquote:first-child:has(a) {
         font-size: 0.85em;
       }
       
