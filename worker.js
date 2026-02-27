@@ -2574,7 +2574,7 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
       }
       
       .streaming-answer > blockquote:first-child {
-        font-size: 0.75em;
+        font-size: 0.85em;
       }
       
 </style>
