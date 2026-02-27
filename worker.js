@@ -2761,7 +2761,7 @@ function getHtmlContent(modelIds, tavilyKeys, title) {
           if (filename.endsWith('.gz')) {
             try {
               var uint8Array = fflate.strToU8(content);
-              var compressed = fflate.gzipSync(uint8Array, { level: 9 });
+              var compressed = fflate.gzipSync(uint8Array, { level: 6 });
               body = compressed;
               contentType = 'application/gzip';
             } catch (e) {
