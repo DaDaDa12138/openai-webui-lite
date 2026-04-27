@@ -2707,6 +2707,20 @@ function getHtmlContent(modelIds, tavilyKeys, title, ttsEnabled = false) {
         }
       }
       
+      /* TTS 滑块底轨颜色（覆盖系统深色模式下的 #3b3b3b） */
+      #ttsSpeedSlider::-webkit-slider-runnable-track,
+      #ttsPitchSlider::-webkit-slider-runnable-track {
+        background: #e0e0e0;
+        border-radius: 2px;
+        height: 4px;
+      }
+      #ttsSpeedSlider::-moz-range-track,
+      #ttsPitchSlider::-moz-range-track {
+        background: #e0e0e0;
+        border-radius: 2px;
+        height: 4px;
+      }
+      
 </style>
     <script>
       var isWechat = new RegExp('wechat', 'i').test(window.navigator.userAgent);
