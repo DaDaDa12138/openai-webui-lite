@@ -1,5 +1,6 @@
 FROM node:22-alpine
 WORKDIR /app
-COPY worker.js server.mjs ./
+COPY worker.js ./
+COPY src/server.mjs ./src/
 EXPOSE 8787
-CMD ["node", "server.mjs"]
+CMD ["node", "src/server.mjs"]
