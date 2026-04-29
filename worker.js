@@ -1,11 +1,13 @@
 const isDeno = typeof Deno !== 'undefined';
 const isCf =
   !isDeno &&
-  typeof Request !== 'undefined' &&
-  typeof Request.prototype !== 'undefined';
+  typeof navigator !== 'undefined' &&
+  navigator.userAgent === 'Cloudflare-Workers';
+const isNode =
+  !isDeno && !isCf && typeof process !== 'undefined' && process.versions?.node;
 
 // 获取环境变量
-const SERVER_TYPE = isDeno ? 'DENO' : isCf ? 'CF' : 'VPS';
+const SERVER_TYPE = isDeno ? 'DENO' : isCf ? 'CF' : 'NODE';
 function getEnv(key, env = {}) {
   if (isDeno) {
     return Deno.env.get(key) || '';
@@ -947,13 +949,12 @@ function buildProxyRequest(originalRequest, apiKey) {
   // 设置API密钥
   headers.set('Authorization', `Bearer ${apiKey}`);
 
-  const isNode = typeof process !== 'undefined' && process.versions?.node;
   return {
     method: originalRequest.method,
     headers: headers,
     body: originalRequest.body,
     redirect: 'follow',
-    ...(isNode ? { duplex: 'half' } : {}),
+    ...(isNode ? { duplex: 'half' } : {})
   };
 }
 
