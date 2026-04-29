@@ -252,7 +252,7 @@ A: 在环境变量中配置 `TAVILY_KEYS`，然后在 Web 界面勾选"联网搜
 A: 访问 [Tavily](https://tavily.com/) 注册账号并获取 API Key。可以配置多个 Key 用逗号分隔，系统会自动轮换使用。
 
 **Q: 如何免费使用 TTS 语音朗读功能？**  
-A: 推荐部署 [edgetts-cloudflare-workers-webui](https://github.com/icheer/edgetts-cloudflare-workers-webui)，这是作者开源的另一个项目，基于微软 Edge TTS 提供 OpenAI 兼容的语音合成接口，完全免费，支持 13 种中英文音色、流式传输和超长文本处理。部署到 Cloudflare Workers 后，将服务地址填入本项目的 `TTS_API_BASE` 环境变量即可。
+A: 推荐部署 [edgetts-cloudflare-workers-webui](https://github.com/icheer/edgetts-cloudflare-workers-webui)，这是作者（魔改的）另一个开源项目，基于微软 Edge TTS 提供 OpenAI 兼容的语音合成接口，完全免费，支持 13 种中英文音色、流式传输和超长文本处理。部署到 Cloudflare Workers 后，将服务地址填入本项目的 `TTS_API_BASE` 环境变量即可。
 
 **Q: 如何自定义界面标题和 Favicon？**  
 A: 通过环境变量 `TITLE` 设置自定义标题，如 `TITLE=My AI Assistant`。标题会同时影响网页标题和 Favicon 的显示样式。
