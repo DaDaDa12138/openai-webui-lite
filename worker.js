@@ -1,11 +1,13 @@
 const isDeno = typeof Deno !== 'undefined';
 const isCf =
   !isDeno &&
-  typeof Request !== 'undefined' &&
-  typeof Request.prototype !== 'undefined';
+  typeof navigator !== 'undefined' &&
+  navigator.userAgent === 'Cloudflare-Workers';
+const isNode =
+  !isDeno && !isCf && typeof process !== 'undefined' && process.versions?.node;
 
 // 获取环境变量
-const SERVER_TYPE = isDeno ? 'DENO' : isCf ? 'CF' : 'VPS';
+const SERVER_TYPE = isDeno ? 'DENO' : isCf ? 'CF' : 'NODE';
 function getEnv(key, env = {}) {
   if (isDeno) {
     return Deno.env.get(key) || '';
@@ -165,8 +167,16 @@ async function handleRequest(request, env = {}) {
     CHAT_TYPE = 'qwen';
   } else if (/deepseek/i.test(TITLE)) {
     CHAT_TYPE = 'deepseek';
+  } else if (/glm|zhipu/i.test(TITLE)) {
+    CHAT_TYPE = 'glm';
+  } else if (/minimax/i.test(TITLE)) {
+    CHAT_TYPE = 'minimax';
+  } else if (/kimi|moonshot/i.test(TITLE)) {
+    CHAT_TYPE = 'kimi';
   } else if (/router/i.test(TITLE)) {
     CHAT_TYPE = 'router';
+  } else if (/nvidia/i.test(TITLE)) {
+    CHAT_TYPE = 'nvidia';
   }
 
   /**
@@ -951,7 +961,8 @@ function buildProxyRequest(originalRequest, apiKey) {
     method: originalRequest.method,
     headers: headers,
     body: originalRequest.body,
-    redirect: 'follow'
+    redirect: 'follow',
+    ...(isNode ? { duplex: 'half' } : {})
   };
 }
 
@@ -1015,6 +1026,8 @@ function getLiteModelId(modelIds) {
     .map(i => i.split('=')[0].trim())
     .filter(i => i);
   const parts = [
+    'silicon/deepseek-v4-flash',
+    'tencent/deepseek-v4-flash',
     'or/deepseek-v',
     'deepseek-v',
     'qwen3-next',
@@ -1066,10 +1079,10 @@ function getTavilyPrompt(query) {
 # Role: Advanced Search Strategist
 
 ## 核心定位
-你是Max，一个专为Tavily Search API设计的搜索策略生成器。你的唯一目标是**最大化信息获取的广度与深度**，同时通过精准的关键词设计避免信息冗余或无关联性。
+你是Max，一个专为Tavily Search API设计的搜索策略生成器。你的唯一目标是**最大化信息获取的广度与深度**，通过精准的关键词设计避免信息冗余或无关联性。
 
 ## 关键任务
-从用户的自然语言中提取意图，构造 **0 到 5 个** 搜索关键词，并设定合适的结果数量。
+从用户的自然语言（后附的 \`<User_Context>\` ）中提取意图，构造 **0 到 5 个** 搜索关键词，并设定合适的结果数量。
 
 ## 决策流程
 
@@ -1191,9 +1204,9 @@ function getTavilyPrompt(query) {
 Current Date: ${new Date().toISOString()}
 
 ## 待处理的用户输入
-<User_Question>
+<User_Context>
 ${query}
-</User_Question>
+</User_Context>
   `;
   return str.trim();
 }
@@ -1423,6 +1436,41 @@ function getSvgContent(chatType) {
   ></path>
 </svg>
   `;
+  const svgNvidia = `
+<svg
+  class="icon"
+  viewBox="0 0 24 24"
+  version="1.1"
+  xmlns="http://www.w3.org/2000/svg"
+  width="32"
+  height="32"
+>
+  <rect width="24" height="24" fill="white" />
+  <path
+    d="M8.948 8.798v-1.43a6.7 6.7 0 0 1 .424-.018c3.922-.124 6.493 3.374 6.493 3.374s-2.774 3.851-5.75 3.851c-.398 0-.787-.062-1.158-.185v-4.346c1.528.185 1.837.857 2.747 2.385l2.04-1.714s-1.492-1.952-4-1.952a6.016 6.016 0 0 0-.796.035m0-4.735v2.138l.424-.027c5.45-.185 9.01 4.47 9.01 4.47s-4.08 4.964-8.33 4.964c-.37 0-.733-.035-1.095-.097v1.325c.3.035.61.062.91.062 3.957 0 6.82-2.023 9.593-4.408.459.371 2.34 1.263 2.73 1.652-2.633 2.208-8.772 3.984-12.253 3.984-.335 0-.653-.018-.971-.053v1.864H24V4.063zm0 10.326v1.131c-3.657-.654-4.673-4.46-4.673-4.46s1.758-1.944 4.673-2.262v1.237H8.94c-1.528-.186-2.73 1.245-2.73 1.245s.68 2.412 2.739 3.11M2.456 10.9s2.164-3.197 6.5-3.533V6.201C4.153 6.59 0 10.653 0 10.653s2.35 6.802 8.948 7.42v-1.237c-4.84-.6-6.492-5.936-6.492-5.936z"
+    fill="#76B900"
+  ></path>
+</svg>
+  `;
+  const svgZhipu = `
+<svg
+  height="1em"
+  style="flex:none;line-height:1"
+  viewBox="0 0 24 24"
+  width="1em"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <title>Zhipu</title>
+  <path d="M11.991 23.503a.24.24 0 00-.244.248.24.24 0 00.244.249.24.24 0 00.245-.249.24.24 0 00-.22-.247l-.025-.001zM9.671 5.365a1.697 1.697 0 011.099 2.132l-.071.172-.016.04-.018.054c-.07.16-.104.32-.104.498-.035.71.47 1.279 1.186 1.314h.366c1.309.053 2.338 1.173 2.286 2.523-.052 1.332-1.152 2.38-2.478 2.327h-.174c-.715.018-1.274.64-1.239 1.368 0 .124.018.23.053.337.209.373.54.658.96.8.75.23 1.517-.125 1.9-.782l.018-.035c.402-.64 1.17-.96 1.92-.711.854.284 1.378 1.226 1.099 2.167a1.661 1.661 0 01-2.077 1.102 1.711 1.711 0 01-.907-.711l-.017-.035c-.2-.323-.463-.58-.851-.711l-.056-.018a1.646 1.646 0 00-1.954.746 1.66 1.66 0 01-1.065.764 1.677 1.677 0 01-1.989-1.279c-.209-.906.332-1.83 1.257-2.043a1.51 1.51 0 01.296-.035h.018c.68-.071 1.151-.622 1.116-1.333a1.307 1.307 0 00-.227-.693 2.515 2.515 0 01-.366-1.403 2.39 2.39 0 01.366-1.208c.14-.195.21-.444.227-.693.018-.71-.506-1.261-1.186-1.332l-.07-.018a1.43 1.43 0 01-.299-.07l-.05-.019a1.7 1.7 0 01-1.047-2.114 1.68 1.68 0 012.094-1.101zm-5.575 10.11c.26-.264.639-.367.994-.27.355.096.633.379.728.74.095.362-.007.748-.267 1.013-.402.41-1.053.41-1.455 0a1.062 1.062 0 010-1.482zm14.845-.294c.359-.09.738.024.992.297.254.274.344.665.237 1.025-.107.36-.396.634-.756.718-.551.128-1.1-.22-1.23-.781a1.05 1.05 0 01.757-1.26zm-.064-4.39c.314.32.49.753.49 1.206 0 .452-.176.886-.49 1.206-.315.32-.74.5-1.185.5-.444 0-.87-.18-1.184-.5a1.727 1.727 0 010-2.412 1.654 1.654 0 012.369 0zm-11.243.163c.364.484.447 1.128.218 1.691a1.665 1.665 0 01-2.188.923c-.855-.36-1.26-1.358-.907-2.228a1.68 1.68 0 011.33-1.038c.593-.08 1.183.169 1.547.652zm11.545-4.221c.368 0 .708.2.892.524.184.324.184.724 0 1.048a1.026 1.026 0 01-.892.524c-.568 0-1.03-.47-1.03-1.048 0-.579.462-1.048 1.03-1.048zm-14.358 0c.368 0 .707.2.891.524.184.324.184.724 0 1.048a1.026 1.026 0 01-.891.524c-.569 0-1.03-.47-1.03-1.048 0-.579.461-1.048 1.03-1.048zm10.031-1.475c.925 0 1.675.764 1.675 1.706s-.75 1.705-1.675 1.705-1.674-.763-1.674-1.705c0-.942.75-1.706 1.674-1.706zm-2.626-.684c.362-.082.653-.356.761-.718a1.062 1.062 0 00-.238-1.028 1.017 1.017 0 00-.996-.294c-.547.14-.881.7-.752 1.257.13.558.675.907 1.225.783zm0 16.876c.359-.087.644-.36.75-.72a1.062 1.062 0 00-.237-1.019 1.018 1.018 0 00-.985-.301 1.037 1.037 0 00-.762.717c-.108.361-.017.754.239 1.028.245.263.606.377.953.305l.043-.01zM17.19 3.5a.631.631 0 00.628-.64c0-.355-.279-.64-.628-.64a.631.631 0 00-.628.64c0 .355.28.64.628.64zm-10.38 0a.631.631 0 00.628-.64c0-.355-.28-.64-.628-.64a.631.631 0 00-.628.64c0 .355.279.64.628.64zm-5.182 7.852a.631.631 0 00-.628.64c0 .354.28.639.628.639a.63.63 0 00.627-.606l.001-.034a.62.62 0 00-.628-.64zm5.182 9.13a.631.631 0 00-.628.64c0 .355.279.64.628.64a.631.631 0 00.628-.64c0-.355-.28-.64-.628-.64zm10.38.018a.631.631 0 00-.628.64c0 .355.28.64.628.64a.631.631 0 00.628-.64c0-.355-.279-.64-.628-.64zm5.182-9.148a.631.631 0 00-.628.64c0 .354.279.639.628.639a.631.631 0 00.628-.64c0-.355-.28-.64-.628-.64zm-.384-4.992a.24.24 0 00.244-.249.24.24 0 00-.244-.249.24.24 0 00-.244.249c0 .142.122.249.244.249zM11.991.497a.24.24 0 00.245-.248A.24.24 0 0011.99 0a.24.24 0 00-.244.249c0 .133.108.236.223.247l.021.001zM2.011 6.36a.24.24 0 00.245-.249.24.24 0 00-.244-.249.24.24 0 00-.244.249.24.24 0 00.244.249zm0 11.263a.24.24 0 00-.243.248.24.24 0 00.244.249.24.24 0 00.244-.249.252.252 0 00-.244-.248zm19.995-.018a.24.24 0 00-.245.248.24.24 0 00.245.25.24.24 0 00.244-.249.24.24 0 00-.22-.248l-.024-.001z" fill="#3f7fff"
+  ></path>
+</svg>
+  `;
+  const svgMinimax = `
+<svg height="1em" style="flex:none;line-height:1" viewBox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><title>Minimax</title><defs><linearGradient id="lobe-icons-minimax-fill" x1="0%" x2="100.182%" y1="50.057%" y2="50.057%"><stop offset="0%" stop-color="#E2167E"></stop><stop offset="100%" stop-color="#FE603C"></stop></linearGradient></defs><path d="M16.278 2c1.156 0 2.093.927 2.093 2.07v12.501a.74.74 0 00.744.709.74.74 0 00.743-.709V9.099a2.06 2.06 0 012.071-2.049A2.06 2.06 0 0124 9.1v6.561a.649.649 0 01-.652.645.649.649 0 01-.653-.645V9.1a.762.762 0 00-.766-.758.762.762 0 00-.766.758v7.472a2.037 2.037 0 01-2.048 2.026 2.037 2.037 0 01-2.048-2.026v-12.5a.785.785 0 00-.788-.753.785.785 0 00-.789.752l-.001 15.904A2.037 2.037 0 0113.441 22a2.037 2.037 0 01-2.048-2.026V18.04c0-.356.292-.645.652-.645.36 0 .652.289.652.645v1.934c0 .263.142.506.372.638.23.131.514.131.744 0a.734.734 0 00.372-.638V4.07c0-1.143.937-2.07 2.093-2.07zm-5.674 0c1.156 0 2.093.927 2.093 2.07v11.523a.648.648 0 01-.652.645.648.648 0 01-.652-.645V4.07a.785.785 0 00-.789-.78.785.785 0 00-.789.78v14.013a2.06 2.06 0 01-2.07 2.048 2.06 2.06 0 01-2.071-2.048V9.1a.762.762 0 00-.766-.758.762.762 0 00-.766.758v3.8a2.06 2.06 0 01-2.071 2.049A2.06 2.06 0 010 12.9v-1.378c0-.357.292-.646.652-.646.36 0 .653.29.653.646V12.9c0 .418.343.757.766.757s.766-.339.766-.757V9.099a2.06 2.06 0 012.07-2.048 2.06 2.06 0 012.071 2.048v8.984c0 .419.343.758.767.758.423 0 .766-.339.766-.758V4.07c0-1.143.937-2.07 2.093-2.07z" fill="url(#lobe-icons-minimax-fill)" fill-rule="nonzero"></path></svg>
+  `;
+  const svgKimi = `
+<svg height="1em" style="flex:none;line-height:1" viewBox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><title>Kimi</title><rect width="24" height="24" fill="#1A1A1A" rx="4"/><path d="M21.846 0a1.923 1.923 0 110 3.846H20.15a.226.226 0 01-.227-.226V1.923C19.923.861 20.784 0 21.846 0z" fill="#1783FF"></path><path d="M11.065 11.199l7.257-7.2c.137-.136.06-.41-.116-.41H14.3a.164.164 0 00-.117.051l-7.82 7.756c-.122.12-.302.013-.302-.179V3.82c0-.127-.083-.23-.185-.23H3.186c-.103 0-.186.103-.186.23V19.77c0 .128.083.23.186.23h2.69c.103 0 .186-.102.186-.23v-3.25c0-.069.025-.135.069-.178l2.424-2.406a.158.158 0 01.205-.023l6.484 4.772a7.677 7.677 0 003.453 1.283c.108.012.2-.095.2-.23v-3.06c0-.117-.07-.212-.164-.227a5.028 5.028 0 01-2.027-.807l-5.613-4.064c-.117-.078-.132-.279-.028-.381z" fill="#fff"></path></svg>
+  `;
   const svgDefault = `
 <svg
   t="1763444006745"
@@ -1455,6 +1503,16 @@ function getSvgContent(chatType) {
       return svgDeepseek;
     case 'router':
       return svgRouter;
+    case 'nvidia':
+      return svgNvidia;
+    case 'glm':
+    case 'zhipu':
+      return svgZhipu;
+    case 'minimax':
+      return svgMinimax;
+    case 'kimi':
+    case 'moonshot':
+      return svgKimi;
     default:
       return svgDefault;
   }
@@ -3650,7 +3708,7 @@ function getHtmlContent(modelIds, tavilyKeys, title, ttsEnabled = false) {
                       align-items: center;
                       gap: 8px;
                       margin-top: 8px;
-                      padding-top: 8px;
+                      padding-top: 12px;
                       border-top: 1px solid #f0f0f0;
                       min-height: 34px;
                     "
@@ -5532,6 +5590,9 @@ function getHtmlContent(modelIds, tavilyKeys, title, ttsEnabled = false) {
           createNewSession() {
             if (this.isLoading || this.isStreaming || this.isUploadingImage)
               return;
+            // 切换会话时停止所有 TTS 播放并清空音频缓存
+            this.stopAllTts();
+            this.ttsAudioMap = {};
             // 保存当前会话的草稿
             this.saveDraftToCurrentSession();
             const firstSession = this.sessions[0];
@@ -6831,11 +6892,34 @@ function getHtmlContent(modelIds, tavilyKeys, title, ttsEnabled = false) {
             var searchQueries = [];
             var searchCounts = [];
             if (this.needSearch) {
-              var queryStr = userMessage;
-              if (session.messages.length > 1) {
-                queryStr +=
-                  '\\n\\n当前会话摘要："' + (session.summary || '') + '"';
+              // 构建包含历史用户发言的上下文
+              var queryStr = '';
+
+              // 如果当前会话有摘要标题, 则在搜索时加入摘要标题作为上下文
+              if (session.summary) {
+                queryStr += '## 对话摘要标题：\\n' + session.summary + '\\n\\n';
               }
+
+              // 收集历史用户消息（最多取最近5轮，避免过长）
+              var userMessages = session.messages
+                .filter(msg => msg.type === 'user')
+                .slice(-5); // 取最近5轮用户发言
+
+              if (userMessages.length > 1) {
+                queryStr += '## 用户历史问句： \\n\`\`\`\\n';
+                userMessages.slice(0, -1).forEach((msg, index) => {
+                  queryStr += \`\${index + 1}. \${(msg.content || '').slice(0, 200)}\\n\`;
+                });
+                queryStr += '\`\`\`\\n\\n';
+              }
+
+              // 强调最新的问句
+              const latestSubTitle =
+                userMessages.length > 1
+                  ? '## 当前最新用户问句（请重点关注）：'
+                  : '## 用户问句：';
+              queryStr += latestSubTitle + '\\n\`' + userMessage + '\`';
+
               var searchResList = await fetch('/search', {
                 method: 'POST',
                 headers: {
@@ -6890,10 +6974,11 @@ function getHtmlContent(modelIds, tavilyKeys, title, ttsEnabled = false) {
                     new Date().toDateString() +
                     ' ' +
                     new Date().toTimeString() +
-                    '，请据此推断"最近"、"今年"等时间词的具体含义。\\n你无需针对"用户澄清真实时间"这件事做出任何提及和表态，请专注于核心问题的解答。\\n\\n' +
+                    '，请据此推断用户问句中可能存在的"最近"、"今年"等时间词的具体含义。\\n你无需针对"用户澄清真实时间"这件事做出任何提及和表态，请专注于核心问题的解答。\\n\\n' +
                     '## 严格执行原则 (Critical Rules)\\n' +
                     '### 1. 事实基准 (Grounding)\\n' +
                     '*   **优先权**：搜索语料的权重 **高于** 你的内部训练知识。如果搜索结果与你的记忆冲突（特别是时效性信息），**必须**以搜索结果为准。\\n' +
+                    '*   **相关性**：搜索结果中可能包含与问题不直接相关甚至无关的信息，请根据问题的核心进行筛选。\\n' +
                     '*   **诚实性**：如果搜索结果中没有包含回答问题所需的关键信息，请明确指出"搜索结果未提及此事"，严禁编造数据。\\n\\n' +
                     '### 2. "最大化"信息的处理\\n' +
                     '*   你收到的搜索结果可能覆盖了问题的不同维度（定义、新闻、正反观点等）。\\n' +
@@ -6914,12 +6999,12 @@ function getHtmlContent(modelIds, tavilyKeys, title, ttsEnabled = false) {
                     '4.  **来源列表 (References)**\\n' +
                     '    *   列出你实际引用的参考链接(应当是包含真实url、可通过点击跳转的Markdown超链接，例如：1. [DeepSeek - Wikipedia](https://en.wikipedia.org/wiki/DeepSeek) )。\\n\\n' +
                     '---\\n\\n' +
-                    '## 用户问题 (User Question)\\n' +
-                    '<User_Question>\\n' +
+                    "## 用户问句 (User's Query)\\n" +
+                    '<User_Query>\\n' +
                     queryStr +
                     '\\n' +
-                    '</User_Question>\\n\\n' +
-                    '现在你的任务是基于上述提供的**实时搜索结果**（Tavily_Search_Context），回答用户的原始问题。你需要像撰写深度调查报告一样，将碎片化的信息拼凑成完整的逻辑链条。'
+                    '</User_Query>\\n\\n' +
+                    '现在你的任务是基于上述提供的**实时搜索结果**（<Tavily_Search_Context>），回答用户的原始问题。你需要像撰写深度调查报告一样，将碎片化的信息拼合成完整的逻辑链条。'
                 });
                 // 显示搜索结果数量（如果有）
                 if (searchQueries.length && !this.streamingContent) {
